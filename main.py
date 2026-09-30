@@ -6,6 +6,7 @@ import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import requests
 from dotenv import load_dotenv
@@ -13,6 +14,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fpdf import FPDF
+from PIL import Image
 from pydantic import BaseModel, Field
 
 load_dotenv()
@@ -139,6 +141,42 @@ def _pdf_text(text: str) -> str:
     return re.sub(r"[^\x00-\xff]", "?", text)
 
 
+def _pdf_image(image: str | None) -> io.BytesIO | None:
+    if not image:
+        return None
+    if image.startswith("data:image/") and "," in image:
+        try:
+            _, encoded = image.split(",", 1)
+            image_bytes = base64.b64decode(encoded, validate=True)
+        except ValueError:
+            return None
+    else:
+        parsed = urlsplit(image)
+        if parsed.scheme != "https" or parsed.hostname != "images.unsplash.com" or parsed.port not in (None, 443):
+            return None
+        try:
+            response = requests.get(image, timeout=15, allow_redirects=False, stream=True)
+            response.raise_for_status()
+            if not response.headers.get("content-type", "").startswith("image/"):
+                return None
+            image_bytes = response.content
+        except requests.RequestException:
+            return None
+    if len(image_bytes) > 10_000_000:
+        return None
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as source:
+            if source.width * source.height > 24_000_000:
+                return None
+            result = io.BytesIO()
+            source.convert("RGB").save(result, format="PNG")
+            result.name = "panel.png"
+            result.seek(0)
+            return result
+    except (OSError, Image.DecompressionBombError):
+        return None
+
+
 @app.post("/api/export")
 def export_comic(request: ExportRequest):
     pdf = FPDF(format="A4")
@@ -153,19 +191,10 @@ def export_comic(request: ExportRequest):
         pdf.set_text_color(28, 39, 38)
         pdf.set_font("Helvetica", "B", 26)
         pdf.multi_cell(0, 12, _pdf_text(panel.title))
-        image_data = panel.image
-        if image_data and image_data.startswith("data:image/") and "," in image_data:
-            try:
-                metadata, encoded = image_data.split(",", 1)
-                image_bytes = base64.b64decode(encoded, validate=True)
-                image_format = metadata.split("/", 1)[1].split(";", 1)[0].upper()
-                if image_format in {"JPEG", "JPG", "PNG", "WEBP"}:
-                    stream = io.BytesIO(image_bytes)
-                    stream.name = f"panel.{image_format.lower()}"
-                    pdf.image(stream, x=16, y=pdf.get_y() + 5, w=178, h=112, keep_aspect_ratio=True)
-                    pdf.set_y(pdf.get_y() + 121)
-            except (ValueError, OSError):
-                pass
+        stream = _pdf_image(panel.image)
+        if stream:
+            pdf.image(stream, x=16, y=pdf.get_y() + 5, w=178, h=112, keep_aspect_ratio=True)
+            pdf.set_y(pdf.get_y() + 121)
         pdf.ln(5)
         pdf.set_font("Helvetica", size=14)
         pdf.set_text_color(55, 64, 61)
