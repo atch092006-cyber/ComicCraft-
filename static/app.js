@@ -34,6 +34,15 @@ function renderComic(comic, mode = "AI-GENERATED COMIC") {
       image.loading = index > 1 ? "lazy" : "eager";
       image.referrerPolicy = "no-referrer";
       imageBox.prepend(image);
+    } else {
+      const placeholder = document.createElement("div");
+      placeholder.className = "panel-art-placeholder";
+      const artIcon = document.createElement("i");
+      artIcon.dataset.lucide = panel.image_error ? "image-off" : "image";
+      const label = document.createElement("span");
+      label.textContent = panel.image_error ? "Illustration unavailable" : "Illustration pending";
+      placeholder.append(artIcon, label);
+      imageBox.prepend(placeholder);
     }
     const copy = document.createElement("div");
     copy.className = "panel-copy";
@@ -102,7 +111,7 @@ form.addEventListener("submit", async (event) => {
       throw new Error(message);
     }
     renderComic(result);
-    notify("Your new comic is ready.");
+    notify(result.image_warning || "Your new comic is ready.");
   } catch (error) {
     notify(error.message || "Could not reach ComicCraft. Check that the server is running.");
   } finally {
@@ -158,7 +167,9 @@ async function updateStatus() {
     const note = document.querySelector("#engine-note-text");
     if (status.gemini) {
       provider.textContent = status.images ? "GEMINI + IMAGES" : "GEMINI READY";
-      note.textContent = status.images ? "Story and illustration generation are ready." : "Gemini is ready; add HF_TOKEN for generated illustrations.";
+      note.textContent = status.image_provider === "Hugging Face"
+        ? "Stories and illustrations use Gemini and Hugging Face."
+        : `Gemini stories and ${status.image_model} illustrations; image quota may require billing.`;
     } else {
       provider.textContent = "ADD GEMINI KEY";
       note.textContent = "Add GEMINI_API_KEY to .env to create comics.";

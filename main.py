@@ -21,6 +21,7 @@ load_dotenv()
 
 ROOT = Path(__file__).parent
 DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
+DEFAULT_GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image"
 app = FastAPI(title="ComicCraft - AI Comic Story Creator using Gemini Models")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
@@ -62,9 +63,14 @@ def home():
 
 @app.get("/api/status")
 def status():
+    hugging_face = bool(os.getenv("HF_TOKEN"))
+    gemini = bool(os.getenv("GEMINI_API_KEY"))
     return {
-        "gemini": bool(os.getenv("GEMINI_API_KEY")),
-        "images": bool(os.getenv("HF_TOKEN")),
+        "gemini": gemini,
+        "images": hugging_face or gemini,
+        "image_provider": "Hugging Face" if hugging_face else ("Gemini" if gemini else None),
+        "image_model": os.getenv("HF_IMAGE_MODEL", "stabilityai/stable-diffusion-xl-base-1.0")
+        if hugging_face else os.getenv("GEMINI_IMAGE_MODEL", DEFAULT_GEMINI_IMAGE_MODEL),
         "model": os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL),
     }
 
@@ -96,10 +102,29 @@ Include exactly four panels. Keep the character and art direction visually consi
     return comic
 
 
+def _make_gemini_image(image_prompt: str, style: str) -> str | None:
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    result = client.models.generate_content(
+        model=os.getenv("GEMINI_IMAGE_MODEL", DEFAULT_GEMINI_IMAGE_MODEL),
+        contents=f"Create one original {style} comic panel illustration. Scene: {image_prompt}. No text, lettering, captions, or watermark.",
+        config=types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"]),
+    )
+    for part in result.parts or []:
+        image = part.inline_data
+        if image and image.data:
+            mime_type = image.mime_type or "image/png"
+            encoded = base64.b64encode(image.data).decode("ascii")
+            return f"data:{mime_type};base64,{encoded}"
+    return None
+
+
 def _make_image(image_prompt: str, style: str) -> str | None:
     token = os.getenv("HF_TOKEN")
     if not token:
-        return None
+        return _make_gemini_image(image_prompt, style)
     model = os.getenv("HF_IMAGE_MODEL", "stabilityai/stable-diffusion-xl-base-1.0")
     result = requests.post(
         f"https://router.huggingface.co/hf-inference/models/{model}",
@@ -131,12 +156,23 @@ async def generate(request: ComicRequest):
         ),
         return_exceptions=True,
     )
+    image_errors = [image for image in images if isinstance(image, Exception)]
+    image_warning = None
+    if image_errors:
+        details = " ".join(str(error) for error in image_errors)
+        if "RESOURCE_EXHAUSTED" in details or "429" in details:
+            image_warning = "Image quota exceeded. Enable Gemini image billing or configure HF_TOKEN for illustrations."
+        elif "PERMISSION_DENIED" in details or "403" in details:
+            image_warning = "Gemini image generation is not enabled for this account. Enable image access or configure HF_TOKEN."
+        else:
+            image_warning = "Illustrations could not be generated. Check image-model access or configure HF_TOKEN."
     panels = []
     for panel, image in zip(comic.panels, images):
         panel_data = panel.model_dump()
         panel_data["image"] = image if isinstance(image, str) else None
+        panel_data["image_error"] = isinstance(image, Exception) or image is None
         panels.append(panel_data)
-    return {"title": comic.title, "panels": panels}
+    return {"title": comic.title, "panels": panels, "image_warning": image_warning}
 
 
 def _pdf_text(text: str) -> str:
