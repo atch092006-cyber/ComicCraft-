@@ -22,7 +22,7 @@ Open [http://localhost:8000](http://localhost:8000). Add `GEMINI_API_KEY` to `.e
 | `GEMINI_MODEL` | Gemini text model | `gemini-3.5-flash-lite` |
 | `GEMINI_IMAGE_MODEL` | Gemini image-generation model | `gemini-3.1-flash-image` |
 | `HF_TOKEN` | Hugging Face token with inference access | unset |
-| `HF_IMAGE_MODEL` | Image model served by Hugging Face Inference | `stabilityai/stable-diffusion-xl-base-1.0` |
+| `HF_IMAGE_MODEL` | Image model served by Hugging Face Inference | `stabilityai/stable-diffusion-3-medium-diffusers` |
 
 The Hugging Face image endpoint uses hosted inference; it does not download model weights or require a local GPU. Model availability and inference quotas depend on the provider account. Gemini and Hugging Face image generation both require an available model quota.
 
