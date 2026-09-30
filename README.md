@@ -12,7 +12,7 @@ cp .env.example .env
 uvicorn main:app --reload
 ```
 
-Open [http://localhost:8000](http://localhost:8000). Without API credentials, the interactive studio runs in demo mode. Add `GEMINI_API_KEY` to `.env` for live story generation. Add a Hugging Face access token as `HF_TOKEN` to generate images; otherwise, Gemini-generated panels use the illustrated demo artwork.
+Open [http://localhost:8000](http://localhost:8000). Add `GEMINI_API_KEY` to `.env` to generate comics from user prompts. Add a Hugging Face access token as `HF_TOKEN` to generate panel illustrations. Without a Gemini key, the studio clearly reports that generation is unavailable instead of substituting a canned story.
 
 ## Configuration
 

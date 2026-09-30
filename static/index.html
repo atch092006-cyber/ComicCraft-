@@ -18,8 +18,8 @@
         <span class="brand-mark"><i data-lucide="book-open-text"></i></span>
         <span class="brand-name">comic<span>craft</span></span>
       </a>
-      <div class="topbar-center"><span class="live-dot"></span><span id="provider-status">DEMO STUDIO</span></div>
-      <button class="top-export" id="download-button" type="button"><i data-lucide="download"></i><span>Export comic</span></button>
+      <div class="topbar-center"><span class="live-dot"></span><span id="provider-status">ADD GEMINI KEY</span></div>
+      <button class="top-export" id="download-button" type="button" disabled><i data-lucide="download"></i><span>Export comic</span></button>
     </header>
 
     <main class="workspace">
@@ -32,17 +32,17 @@
 
         <form id="comic-form">
           <label class="field-label" for="story-prompt">Your story idea <span class="optional">REQUIRED</span></label>
-          <textarea id="story-prompt" name="prompt" maxlength="1000" required> A brave little fox discovers a secret orchestra playing beneath the roots of an enchanted forest.</textarea>
+          <textarea id="story-prompt" name="prompt" maxlength="1000" required placeholder="A lighthouse keeper discovers a message from a city beneath the sea."></textarea>
           <div class="field-bottom"><span>Start anywhere. Magic helps.</span><span id="character-count">0 / 1000</span></div>
 
           <div class="field-grid">
             <div class="field-group">
               <label class="field-label" for="character-name">Your hero</label>
-              <input id="character-name" name="character" maxlength="60" value="Pip" placeholder="Name your hero">
+              <input id="character-name" name="character" maxlength="60" placeholder="Name your hero">
             </div>
             <div class="field-group">
               <label class="field-label" for="story-setting">Setting</label>
-              <input id="story-setting" name="setting" maxlength="100" value="Enchanted forest" placeholder="Where to?">
+              <input id="story-setting" name="setting" maxlength="100" placeholder="Where to?">
             </div>
           </div>
 
@@ -61,7 +61,7 @@
           </div>
 
           <button class="generate-button" type="submit"><i data-lucide="sparkles"></i><span>Make my comic</span><i class="button-arrow" data-lucide="arrow-up-right"></i></button>
-          <div class="engine-note"><i data-lucide="wand-sparkles"></i><span>Powered by a little imagination <b>and Gemini</b></span></div>
+          <div class="engine-note"><i data-lucide="wand-sparkles"></i><span id="engine-note-text">Gemini turns your prompt into a comic.</span></div>
         </form>
 
         <div class="creator-footer"><span class="avatar-stack"><span>✦</span><span>✎</span><span>☺</span></span><span>Made for the stories in your head.</span></div>
@@ -70,15 +70,15 @@
       <section class="preview-area" aria-labelledby="preview-heading">
         <div class="preview-header">
           <div><div class="eyebrow"><span class="step-number">02</span> THE COMIC CANVAS</div><h2 id="preview-heading">Your story, <em>in panels.</em></h2></div>
-          <div class="canvas-actions"><span class="panel-count" id="panel-count">4 PANELS</span><button class="icon-button" id="refresh-button" type="button" aria-label="Restore sample comic" title="Restore sample comic"><i data-lucide="rotate-ccw"></i></button></div>
+          <div class="canvas-actions"><span class="panel-count" id="panel-count">0 PANELS</span><button class="icon-button" id="refresh-button" type="button" aria-label="Clear preview" title="Clear preview"><i data-lucide="eraser"></i></button></div>
         </div>
 
         <div class="comic-sheet" id="comic-sheet" aria-live="polite">
-          <div class="sheet-topline"><span id="comic-title">THE LITTLE FOX &amp; THE LOST SONG</span><span id="comic-edition">A COMICCRAFT ORIGINAL <span>✳</span></span></div>
-          <div class="panel-grid" id="panel-grid"></div>
+          <div class="sheet-topline"><span id="comic-title">A STORY WAITING TO BE TOLD</span><span id="comic-edition">A COMICCRAFT ORIGINAL <span>✳</span></span></div>
+          <div class="panel-grid is-empty" id="panel-grid"></div>
           <div class="sheet-footer"><span><i data-lucide="sparkle"></i> A new world, made just for you</span><span>STORY NO. <b>001</b></span></div>
         </div>
-        <div class="canvas-caption"><span><i data-lucide="mouse-pointer-2"></i> A little preview from a big imagination.</span><span id="canvas-mode">SAMPLE COMIC</span></div>
+        <div class="canvas-caption"><span><i data-lucide="mouse-pointer-2"></i> Every comic begins with your idea.</span><span id="canvas-mode">READY WHEN YOU ARE</span></div>
       </section>
     </main>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>

@@ -26,8 +26,8 @@ app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 class ComicRequest(BaseModel):
     prompt: str = Field(min_length=8, max_length=1000)
-    character: str = Field(default="Pip", max_length=60)
-    setting: str = Field(default="Enchanted forest", max_length=100)
+    character: str = Field(default="", max_length=60)
+    setting: str = Field(default="", max_length=100)
     tone: str = Field(default="Adventurous", max_length=50)
     style: str = Field(default="Storybook", max_length=50)
 
@@ -72,13 +72,14 @@ def _make_story(request: ComicRequest) -> Comic:
     from google import genai
 
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    prompt = f"""Create a cohesive, original four-panel comic for a general audience.
+    prompt = f"""Create a cohesive, original four-panel comic for a general audience, based on the user's story idea below.
 Story idea: {request.prompt}
-Main character: {request.character}
-Setting: {request.setting}
+Main character (if provided): {request.character or "Infer from the story idea"}
+Setting (if provided): {request.setting or "Infer from the story idea"}
 Tone: {request.tone}
 Art style: {request.style}
 
+The story idea is the source of truth. Preserve its premise, named characters, setting, genre, and important details. Do not replace it with a different story or introduce unrelated characters or settings.
 Return only JSON with this exact shape:
 {{"title":"short comic title","panels":[{{"title":"short panel heading","narration":"1-2 concise sentences of comic narration or dialogue","image_prompt":"visual description for one comic illustration; no text, letters, speech bubbles or watermark"}}]}}
 Include exactly four panels. Keep the character and art direction visually consistent across every image_prompt."""

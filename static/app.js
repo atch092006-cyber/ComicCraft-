@@ -1,26 +1,9 @@
-const art = [
-  "photo-1474511320723-9a56873867b5",
-  "photo-1441974231531-c6227db57b76",
-  "photo-1511497584788-876760111969",
-  "photo-1470770841072-f978cf4d019e",
-];
-
-const sample = {
-  title: "The Little Fox & the Lost Song",
-  panels: [
-    { title: "A sound in the roots", narration: "Pip heard a tiny tune beneath the oldest oak. It hummed like a secret waiting to be found.", image: `https://images.unsplash.com/${art[0]}?auto=format&fit=crop&w=960&q=85` },
-    { title: "Down, down, deeper", narration: "Past the ferns and the foxglove bells, a golden glow danced in the dark.", image: `https://images.unsplash.com/${art[1]}?auto=format&fit=crop&w=960&q=85` },
-    { title: "The forest orchestra", narration: "Mushroom drummers, beetle fiddlers, and crickets on the keys. The whole forest was making music!", image: `https://images.unsplash.com/${art[2]}?auto=format&fit=crop&w=960&q=85` },
-    { title: "A song for everyone", narration: "Pip sang along. By morning, even the birds knew the tune by heart.", image: `https://images.unsplash.com/${art[3]}?auto=format&fit=crop&w=960&q=85` },
-  ],
-};
-
 const form = document.querySelector("#comic-form");
 const promptField = document.querySelector("#story-prompt");
 const countLabel = document.querySelector("#character-count");
 const grid = document.querySelector("#panel-grid");
 const toast = document.querySelector("#toast");
-let currentComic = structuredClone(sample);
+let currentComic = null;
 let selectedTone = "Adventurous";
 let toastTimer;
 
@@ -28,11 +11,13 @@ function icons() {
   window.lucide?.createIcons();
 }
 
-function renderComic(comic, mode = "SAMPLE COMIC") {
+function renderComic(comic, mode = "AI-GENERATED COMIC") {
   currentComic = comic;
+  grid.classList.remove("is-empty");
   document.querySelector("#comic-title").textContent = comic.title;
   document.querySelector("#panel-count").textContent = `${comic.panels.length} PANELS`;
   document.querySelector("#canvas-mode").textContent = mode;
+  document.querySelector("#download-button").disabled = false;
   grid.replaceChildren(...comic.panels.map((panel, index) => {
     const card = document.createElement("article");
     card.className = "comic-panel";
@@ -63,32 +48,26 @@ function renderComic(comic, mode = "SAMPLE COMIC") {
   icons();
 }
 
+function clearPreview() {
+  currentComic = null;
+  grid.classList.add("is-empty");
+  grid.replaceChildren();
+  const empty = document.createElement("div");
+  empty.className = "empty-state";
+  empty.innerHTML = '<i data-lucide="book-open-check"></i><span>Your next story starts with an idea only you could dream up.</span>';
+  grid.append(empty);
+  document.querySelector("#comic-title").textContent = "A STORY WAITING TO BE TOLD";
+  document.querySelector("#panel-count").textContent = "0 PANELS";
+  document.querySelector("#canvas-mode").textContent = "READY WHEN YOU ARE";
+  document.querySelector("#download-button").disabled = true;
+  icons();
+}
+
 function notify(message) {
   toast.textContent = message;
   toast.classList.add("is-visible");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 3400);
-}
-
-function makeDemoComic(fields) {
-  const hero = fields.character.trim() || "Pip";
-  const place = fields.setting.trim() || "an enchanted forest";
-  const idea = fields.prompt.trim().replace(/[.!?]+$/, "");
-  const beats = [
-    ["A curious beginning", `${hero} set off on a little adventure: ${idea}.`],
-    ["Something unexpected", `Around a bend in ${place}, the world was more wonderful than ${hero} imagined.`],
-    ["A clever idea", `One small, bright idea was all ${hero} needed to turn things around.`],
-    ["Home, changed forever", `${hero} carried a brand-new story home. The best adventures always leave a little magic behind.`],
-  ];
-  return {
-    title: `${hero} & the ${fields.tone.toLowerCase()} adventure`,
-    panels: beats.map(([title, narration], index) => ({
-      title,
-      narration,
-      image_prompt: `${fields.style} illustration of ${hero} in ${place}, panel ${index + 1}`,
-      image: `https://images.unsplash.com/${art[index]}?auto=format&fit=crop&w=960&q=85`,
-    })),
-  };
 }
 
 form.addEventListener("submit", async (event) => {
@@ -116,12 +95,16 @@ form.addEventListener("submit", async (event) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(fields),
     });
-    if (!response.ok) throw new Error("demo");
-    renderComic(await response.json(), "AI-GENERATED COMIC");
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = typeof result.detail === "string" ? result.detail : "Comic generation failed. Please try again.";
+      if (response.status === 503) throw new Error("Gemini API key required. Add GEMINI_API_KEY to .env and restart ComicCraft.");
+      throw new Error(message);
+    }
+    renderComic(result);
     notify("Your new comic is ready.");
-  } catch {
-    renderComic(makeDemoComic(fields), "DEMO PREVIEW");
-    notify("Demo preview ready. Add your Gemini API key for live story generation.");
+  } catch (error) {
+    notify(error.message || "Could not reach ComicCraft. Check that the server is running.");
   } finally {
     button.disabled = false;
     buttonText.textContent = "Make my comic";
@@ -144,11 +127,11 @@ promptField.addEventListener("input", () => {
 });
 
 document.querySelector("#refresh-button").addEventListener("click", () => {
-  renderComic(structuredClone(sample));
-  notify("Sample comic restored.");
+  clearPreview();
 });
 
 document.querySelector("#download-button").addEventListener("click", async () => {
+  if (!currentComic) return;
   try {
     const response = await fetch("/api/export", {
       method: "POST",
@@ -171,13 +154,18 @@ async function updateStatus() {
   try {
     const response = await fetch("/api/status");
     const status = await response.json();
+    const provider = document.querySelector("#provider-status");
+    const note = document.querySelector("#engine-note-text");
     if (status.gemini) {
-      document.querySelector("#provider-status").textContent = status.images ? "GEMINI + IMAGE STUDIO" : "GEMINI STUDIO";
-      document.querySelector("#canvas-mode").textContent = "READY TO CREATE";
+      provider.textContent = status.images ? "GEMINI + IMAGES" : "GEMINI READY";
+      note.textContent = status.images ? "Story and illustration generation are ready." : "Gemini is ready; add HF_TOKEN for generated illustrations.";
+    } else {
+      provider.textContent = "ADD GEMINI KEY";
+      note.textContent = "Add GEMINI_API_KEY to .env to create comics.";
     }
-  } catch { /* The demo remains available without the API server. */ }
+  } catch { /* The prompt canvas remains usable without the generation API. */ }
 }
 
 countLabel.textContent = `${promptField.value.length} / 1000`;
-renderComic(sample);
+clearPreview();
 updateStatus();
