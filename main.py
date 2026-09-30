@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 load_dotenv()
 
 ROOT = Path(__file__).parent
+DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
 app = FastAPI(title="ComicCraft - AI Comic Story Creator using Gemini Models")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
@@ -64,7 +65,7 @@ def status():
     return {
         "gemini": bool(os.getenv("GEMINI_API_KEY")),
         "images": bool(os.getenv("HF_TOKEN")),
-        "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        "model": os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL),
     }
 
 
@@ -84,7 +85,7 @@ Return only JSON with this exact shape:
 {{"title":"short comic title","panels":[{{"title":"short panel heading","narration":"1-2 concise sentences of comic narration or dialogue","image_prompt":"visual description for one comic illustration; no text, letters, speech bubbles or watermark"}}]}}
 Include exactly four panels. Keep the character and art direction visually consistent across every image_prompt."""
     result = client.models.generate_content(
-        model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        model=os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL),
         contents=prompt,
         config={"response_mime_type": "application/json"},
     )

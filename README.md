@@ -19,7 +19,7 @@ Open [http://localhost:8000](http://localhost:8000). Add `GEMINI_API_KEY` to `.e
 | Variable | Purpose | Default |
 | --- | --- | --- |
 | `GEMINI_API_KEY` | Google AI Studio API key for Gemini | unset |
-| `GEMINI_MODEL` | Gemini text model | `gemini-2.5-flash` |
+| `GEMINI_MODEL` | Gemini text model | `gemini-3.5-flash-lite` |
 | `HF_TOKEN` | Hugging Face token with inference access | unset |
 | `HF_IMAGE_MODEL` | Image model served by Hugging Face Inference | `stabilityai/stable-diffusion-xl-base-1.0` |
 
