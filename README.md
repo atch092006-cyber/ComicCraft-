@@ -12,7 +12,23 @@ cp .env.example .env
 uvicorn main:app --reload
 ```
 
-Open [http://localhost:8000](http://localhost:8000). Add `GEMINI_API_KEY` to `.env` to generate comics from user prompts and panel illustrations. Gemini image generation uses `GEMINI_IMAGE_MODEL`. Image generation requires available Gemini image quota or billing. Alternatively, add a Hugging Face access token as `HF_TOKEN` to use its image inference endpoint. Without a Gemini key, the studio clearly reports that generation is unavailable instead of substituting a canned story.
+Open [http://localhost:8000](http://localhost:8000). Gemini generates the story and panel descriptions, so `GEMINI_API_KEY` is required for comic creation. For Hugging Face illustrations, also set `HF_TOKEN`; otherwise ComicCraft uses Gemini image generation and its image quota.
+
+### Configure Hugging Face illustrations
+
+1. Create a fine-grained token at [Hugging Face Access Tokens](https://huggingface.co/settings/tokens) and enable **Make calls to Inference Providers**.
+2. Put the token in your local `.env` file. Never commit or share the token:
+
+	```env
+	GEMINI_API_KEY=your_gemini_api_key
+	HF_TOKEN=hf_your_token
+	HF_IMAGE_MODEL=stabilityai/stable-diffusion-3-medium-diffusers
+	```
+
+3. Restart the server with `uvicorn main:app --reload`.
+4. Open the app, enter a story idea, choose the character, setting, tone, and art style, then select **Make my comic**. ComicCraft generates four panels and their illustrations; **Export comic** downloads them as a PDF.
+
+The selected model and inference-provider access must be available to your Hugging Face account. A token by itself does not enable a model that the provider has retired or does not offer.
 
 ## Configuration
 

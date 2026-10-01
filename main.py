@@ -69,7 +69,7 @@ def status():
         "gemini": gemini,
         "images": hugging_face or gemini,
         "image_provider": "Hugging Face" if hugging_face else ("Gemini" if gemini else None),
-        "image_model": os.getenv("HF_IMAGE_MODEL", "stabilityai/stable-diffusion-3-medium-diffusers")
+        "image_model": os.getenv("HF_IMAGE_MODEL", "stabilityai/stable-diffusion-xl-base-1.0")
         if hugging_face else os.getenv("GEMINI_IMAGE_MODEL", DEFAULT_GEMINI_IMAGE_MODEL),
         "model": os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL),
     }
@@ -102,14 +102,14 @@ Include exactly four panels. Keep the character and art direction visually consi
     return comic
 
 
-def _make_gemini_image(image_prompt: str, style: str) -> str | None:
+def _make_gemini_image(image_prompt: str, style: str, topic: str) -> str | None:
     from google import genai
     from google.genai import types
 
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     result = client.models.generate_content(
         model=os.getenv("GEMINI_IMAGE_MODEL", DEFAULT_GEMINI_IMAGE_MODEL),
-        contents=f"Create one original {style} comic panel illustration. Scene: {image_prompt}. No text, lettering, captions, or watermark.",
+        contents=f"Create one original {style} comic panel illustration based on this story topic: {topic}. Scene: {image_prompt}. No text, lettering, captions, or watermark.",
         config=types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"]),
     )
     for part in result.parts or []:
@@ -121,23 +121,27 @@ def _make_gemini_image(image_prompt: str, style: str) -> str | None:
     return None
 
 
-def _make_image(image_prompt: str, style: str) -> str | None:
+def _make_image(image_prompt: str, style: str, topic: str) -> str | None:
     token = os.getenv("HF_TOKEN")
     if not token:
-        return _make_gemini_image(image_prompt, style)
-    model = os.getenv("HF_IMAGE_MODEL", "stabilityai/stable-diffusion-3-medium-diffusers")
-    result = requests.post(
-        f"https://router.huggingface.co/hf-inference/models/{model}",
-        headers={"Authorization": f"Bearer {token}"},
-        json={"inputs": f"{style} comic illustration, expressive inked lines, {image_prompt}"},
-        timeout=90,
-    )
-    result.raise_for_status()
-    if not result.headers.get("content-type", "").startswith("image/"):
-        return None
-    image_type = result.headers["content-type"].split(";")[0].split("/")[-1]
-    encoded = base64.b64encode(result.content).decode("ascii")
-    return f"data:image/{image_type};base64,{encoded}"
+        return _make_gemini_image(image_prompt, style, topic)
+
+    model = os.getenv("HF_IMAGE_MODEL", "stabilityai/stable-diffusion-xl-base-1.0")
+    try:
+        result = requests.post(
+            f"https://router.huggingface.co/hf-inference/models/{model}",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"inputs": f"{style} comic illustration inspired by the story topic: {topic}. Expressive inked lines. Panel scene: {image_prompt}"},
+            timeout=90,
+        )
+        result.raise_for_status()
+        if not result.headers.get("content-type", "").startswith("image/"):
+            return _make_gemini_image(image_prompt, style, topic)
+        image_type = result.headers["content-type"].split(";")[0].split("/")[-1]
+        encoded = base64.b64encode(result.content).decode("ascii")
+        return f"data:image/{image_type};base64,{encoded}"
+    except Exception:
+        return _make_gemini_image(image_prompt, style, topic)
 
 
 @app.post("/api/generate")
@@ -151,7 +155,7 @@ async def generate(request: ComicRequest):
 
     images = await asyncio.gather(
         *(
-            asyncio.to_thread(_make_image, panel.image_prompt, request.style)
+            asyncio.to_thread(_make_image, panel.image_prompt, request.style, request.prompt)
             for panel in comic.panels
         ),
         return_exceptions=True,
@@ -160,19 +164,12 @@ async def generate(request: ComicRequest):
     image_warning = None
     if image_errors:
         details = " ".join(str(error) for error in image_errors)
-        if os.getenv("HF_TOKEN"):
-            if "429" in details:
-                image_warning = "Hugging Face inference rate limit or quota reached. Check your Inference Provider access and credits, then retry."
-            elif "401" in details or "403" in details:
-                image_warning = "Hugging Face rejected the token or its permissions. Check that HF_TOKEN has Inference Providers access."
-            else:
-                image_warning = "Hugging Face could not generate the illustrations. Check model availability and token access."
-        elif "RESOURCE_EXHAUSTED" in details or "429" in details:
-            image_warning = "Gemini image quota exceeded. Enable image billing or configure HF_TOKEN for illustrations."
+        if "RESOURCE_EXHAUSTED" in details or "429" in details:
+            image_warning = "Image quota exceeded. Enable Gemini image billing or configure HF_TOKEN for illustrations."
         elif "PERMISSION_DENIED" in details or "403" in details:
             image_warning = "Gemini image generation is not enabled for this account. Enable image access or configure HF_TOKEN."
         else:
-            image_warning = "Gemini could not generate the illustrations. Check image-model access or configure HF_TOKEN."
+            image_warning = "Illustrations could not be generated. Check image-model access or configure HF_TOKEN."
     panels = []
     for panel, image in zip(comic.panels, images):
         panel_data = panel.model_dump()
